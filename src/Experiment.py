@@ -137,9 +137,44 @@ class Experiment:
             self.sampledCountAxis = sampledCountAxis
             self.smearedCountAxis = smearedCountAxis
             self.events = events
+
+            self.truthFunction = truth
+
         else:
             # Return the relevant lists
             return ( xAxis, truthAxis, sampledTruthAxis, smearedTruthAxis )
+
+
+
+
+    # def GetResponseMatrix( self, nEvents ):
+
+    #     self.responseMatrix = []
+
+    #     # Loop over the truth spectrum
+    #     for iBinTruth in xrange(self.nBins):
+
+    #         xTruth = self.xAxisCenters[iBinTruth]
+    #         responseThisBin = [ 0 for i in xrange(self.nBins) ]
+
+    #         # Simulate events; check where they end up
+    #         for iEvent in xrange(nEvents):
+
+    #             # Get the smeared x value
+    #             xSmeared = self.Smear(xTruth)
+
+    #             # Find corresponding bin
+    #             iBinSmeared = self.GetClosestIndex( xSmeared, self.xAxisCenters )
+
+    #             # print 'Original bin: {0:4} | Smeared bin: {1:4}'.format( iBin, iBinSmeared )
+
+    #             responseThisBin[iBinSmeared] += 1
+
+
+    #         # Normalize response
+    #         responseThisBin = [ float(count) / sum(responseThisBin) for count in responseThisBin ]
+
+    #         self.responseMatrix.append( responseThisBin )
 
 
 
@@ -279,6 +314,76 @@ class Experiment:
         self.Save( self.c, 'SVD' )
 
 
+
+
+
+    def SVDUnfoldTest_TUnfold( self ):
+
+        # Make the basic plots
+        self.PlotBasicHists()
+
+
+        # Consider the unfolding of a measured spectrum bdat 
+
+        # xini: true underlying spectrum (TH1D, n bins)
+        # bini: reconstructed spectrum (TH1D, n bins)
+        # Adet: response matrix (TH2D, nxn bins)
+
+        # TSVDUnfold *tsvdunf = new TSVDUnfold( bdat, Bcov, bini, xini, Adet );
+        # TH1D* unfresult = tsvdunf->Unfold( kreg );
+
+        # TSVDUnfold (const TH1D *bdat, const TH1D *bini, const TH1D *xini, const TH2D *Adet)
+
+
+        # Make the histogram with the pure smeared counts
+        Hmeas  = self.HistogramFromAxes( self.xAxis, self.smearedTruthAxis, normalize=False, forceTH1D=True )
+        Htruth = self.HistogramFromAxes( self.xAxis, self.truthAxis, normalize=False, forceTH1D=True )
+
+        # Sets the attribute self.responseMatrix and self.b_ini
+        self.EstimateK()
+
+
+        # Plot for several k's
+        colors = [ 40, 41, 42, 43, 46 ]
+        for k in [ 1, 2, 5, 8 ]:
+
+            unfoldObject = ROOT.TSVDUnfold( Hmeas, self.TH1D_b_ini, Htruth, self.TH2D_K )
+
+            Hunfolded    = unfoldObject.Unfold(k)
+
+            Hunfolded.Scale( 1./Hunfolded.Integral('width') )
+
+            Hunfolded.Draw('SAME')
+            Hunfolded.SetLineColor( colors.pop(0) )
+            Hunfolded.SetLineWidth(2)
+
+            # Add entry to legend
+            Hname = GetUniqueRootName()
+            Hunfolded.SetName( Hname )
+            self.leg.AddEntry( Hname, 'SVD (k={0})'.format(k) )
+
+            self.Persistence.append( deepcopy(Hunfolded) )
+
+
+        self.Save( self.c, 'SVD_TUnfold' )
+
+
+        # Plot |d|
+        
+        self.c.Clear()
+
+        self.c.SetLogy()
+
+        D = unfoldObject.GetD()
+
+        D.Draw()
+
+        self.Save( self.c, 'SVD_TUnfold_D' )
+
+        self.c.SetLogy(False)
+
+
+
     def BinByBinUnfoldTest( self ):
 
         # Make the basic plots
@@ -380,7 +485,39 @@ class Experiment:
             self.K[iBin] = [ float(count)/nIter for count in self.K[iBin] ]
 
 
-    def HistogramFromAxes( self, xAxis, yAxis, normalize=False ):
+
+        # ======================================
+        # Some extra variables for TUnfold
+
+
+        # Calculate b_ini (K times pure truth distribution)
+        self.b_ini = list(numpy.dot( self.K, self.truthAxis ))
+
+
+        # Also as TH1D
+        self.TH1D_b_ini = ROOT.TH1D(
+            'b_ini', 'b_ini',
+            self.nBins, array( 'd', self.xAxis )
+            )
+        for iBin in xrange(self.nBins):
+            self.TH1D_b_ini.SetBinContent( iBin, self.b_ini[iBin] )
+
+
+        # Also make TH2D of the response matrix
+        self.TH2D_K = ROOT.TH2D(
+            'K', 'K',
+            self.nBins, array( 'd', self.xAxis ),
+            self.nBins, array( 'd', self.xAxis ),
+            )
+
+        for iBin1 in xrange(self.nBins):
+            for iBin2 in xrange(self.nBins):
+                self.TH2D_K.SetBinContent( iBin1, iBin2, self.K[iBin1][iBin2] )
+
+
+
+
+    def HistogramFromAxes( self, xAxis, yAxis, normalize=False, forceTH1D=False ):
         
         if len(xAxis) == len(yAxis)+1:
             'This is fine'
@@ -396,7 +533,7 @@ class Experiment:
         nBins = len(xAxis)-1
 
         Hname = GetUniqueRootName()
-        H = ROOT.TH1F( Hname, Hname, nBins, array( 'f', xAxis )   )
+        H = ROOT.TH1D( Hname, Hname, nBins, array( 'f', xAxis )   )
 
         if normalize: sumYAxis = float(sum(yAxis))
 

@@ -39,28 +39,32 @@ def main():
     Exp.SetPlotPrefix( 'SmallSmear_' )
     Exp.GeneratePseudoData( nEvents=10000, setOutput=True )
 
-    Exp.BinByBinUnfoldTest()
+    # Exp.BinByBinUnfoldTest()
 
-    Exp.InvertedKUnfoldTest()
+    # Exp.InvertedKUnfoldTest()
 
-    Exp.BayesUnfoldTest()
+    # Exp.BayesUnfoldTest()
 
     Exp.SVDUnfoldTest()
+
+    Exp.SVDUnfoldTest_TUnfold()
+
 
 
 
     Exp.SmearSigma = 0.9
     Exp.SetPlotPrefix( 'BigSmear_' )
-    Exp.GeneratePseudoData( nEvents=10000, setOutput=True )
+    Exp.GeneratePseudoData( nEvents=1000, setOutput=True )
 
-    Exp.BinByBinUnfoldTest()
+    # Exp.BinByBinUnfoldTest()
 
-    Exp.InvertedKUnfoldTest()
+    # Exp.InvertedKUnfoldTest()
 
-    Exp.BayesUnfoldTest()
+    # Exp.BayesUnfoldTest()
 
     Exp.SVDUnfoldTest()
 
+    Exp.SVDUnfoldTest_TUnfold()
 
 
 
